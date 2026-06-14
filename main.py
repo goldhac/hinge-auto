@@ -129,7 +129,7 @@ def do_like(message: str = "") -> None:
         # dispatch slower than expected — short fixed waits drop chars.
         # Expected pixel count grows with message length; require we see
         # well above the empty baseline before sending.
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + 30
         target_pixels = empty_pixels + max(150, 20 * len(message))
         while time.monotonic() < deadline:
             time.sleep(1.0)
@@ -258,6 +258,13 @@ def main() -> int:
     print("Starting in 5s. Make sure Hinge is open on the Discover tab.")
     time.sleep(5)
 
+    # Premade de-dup: cap each premade's per-session use so the same canned
+    # line doesn't go to many people. Once capped, hide it from the judge
+    # (which is stateless per profile and can't self-limit).
+    all_premades = list(config.PREMADES)
+    premade_uses: dict[str, int] = {}
+    premade_cap = getattr(config, "PREMADE_MAX_USES", 3)
+
     likes_sent = 0
     skips = 0
     profiles_seen = 0
@@ -321,6 +328,13 @@ def main() -> int:
         last_frame0_hash = frame0_hash
         duplicate_streak = 0
 
+        # Hide any premade that has hit its per-session cap so the judge
+        # writes a fresh opener for this profile instead of repeating it.
+        config.PREMADES = [
+            p for p in all_premades
+            if premade_uses.get(p["id"], 0) < premade_cap
+        ]
+
         t1 = time.monotonic()
         decision = None
         fatal_error = None
@@ -373,6 +387,13 @@ def main() -> int:
             try:
                 do_like(decision.message)
                 likes_sent += 1
+                if decision.premade_id:
+                    premade_uses[decision.premade_id] = (
+                        premade_uses.get(decision.premade_id, 0) + 1
+                    )
+                    if premade_uses[decision.premade_id] >= premade_cap:
+                        print(f"  (premade '{decision.premade_id}' hit cap "
+                              f"{premade_cap}; hiding it for the rest of the run)")
             except Exception as e:
                 print(f"do_like failed: {e!r} — recovering by skipping this profile.")
                 try:

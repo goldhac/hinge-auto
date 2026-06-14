@@ -294,6 +294,9 @@ def load_backend():
     if backend == "ollama":
         import judge_ollama
         return judge_ollama
+    if backend == "gemini":
+        import judge_gemini
+        return judge_gemini
     raise ValueError(
-        f"Unknown JUDGE_BACKEND={backend!r}. Use 'anthropic' or 'ollama'."
+        f"Unknown JUDGE_BACKEND={backend!r}. Use 'anthropic', 'gemini', or 'ollama'."
     )

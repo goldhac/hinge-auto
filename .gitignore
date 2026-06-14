@@ -14,6 +14,17 @@ _cal/
 debug/
 screenshots/
 
+# Run logs — contain real profile text AND can capture secrets (API keys
+# echoed by tooling). Never commit.
+*.log
+
+# Local agent/session state
+.claude/
+
+# Personal mode overrides — real openers live here, never published
+modes/_akp_local.py
+*.local.py
+
 # Captured screenshots and ad-hoc state files
 _state.png
 _*.png

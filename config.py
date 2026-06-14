@@ -14,7 +14,7 @@ from pathlib import Path
 
 # ---------- Mode selection ----------
 # Which `modes/<name>.py` to load. Overridden per-run by `python main.py --mode X`.
-ACTIVE_MODE = "example_lenient"
+ACTIVE_MODE = "akp"
 
 # These get filled in by _apply_mode() at the bottom of this file. Declared
 # here so static analyzers / IDEs see them. Do not edit by hand — edit the
@@ -48,8 +48,13 @@ DRY_RUN = False
 # run multiple sessions throughout the day. Going much higher per session
 # tends to trigger Hinge's soft-throttle (empty Discover after a burst);
 # spacing batches across the day works better than one giant batch.
-MAX_LIKES_PER_SESSION = 8
-MAX_PROFILES_PER_SESSION = 100
+MAX_LIKES_PER_SESSION = 20
+MAX_PROFILES_PER_SESSION = 20
+
+# Max times any single premade opener may be sent per session. Once a
+# premade hits this cap it's hidden from the judge so it writes a fresh
+# opener instead -- stops the same canned line going to many people.
+PREMADE_MAX_USES = 3
 
 # ---------- Emulator settings ----------
 # Pixel 10 (and recent Pixel models) are 1080x2424. Change if you're using
@@ -70,7 +75,7 @@ FRAMES_PER_PROFILE = 7
 # update the values that don't match.
 COORDS = {
     # Skip / like action targets (Discover screen, photo 1 at top)
-    "skip_button":       (134, 2068),   # X icon on prompt/photo card
+    "skip_button":       (134, 2044),   # X icon on prompt/photo card (calibrated for 1080x2400)
     "heart_photo_1":     (938, 1421),   # Heart icon on photo 1
 
     # Compose box (anchors to the element whose heart was tapped; these
@@ -111,15 +116,17 @@ DELAYS = {
     "after_scroll":     (0.6, 1.0),
     "after_screenshot": (0.2, 0.4),
     "after_tap":        (0.8, 1.4),
-    "after_like_sent":  (2.5, 4.0),
+    "after_like_sent":  (3.5, 5.5),
     "after_skip":       (1.5, 2.5),
 }
 
 # ---------- Judge backend ----------
 # "anthropic" -> uses your ANTHROPIC_API_KEY; best quality, ~$0.02-0.05/profile.
+# "gemini"    -> uses your GEMINI_API_KEY (Google AI Studio); free tier
+#                available, strong vision. See judge_gemini.py.
 # "ollama"    -> uses Ollama Cloud (free tier) or local Ollama; lower quality
 #                but no per-token cost.
-JUDGE_BACKEND = "anthropic"
+JUDGE_BACKEND = "gemini"
 
 # ---------- Anthropic settings (when JUDGE_BACKEND == "anthropic") ----------
 # Sonnet is the default — cheaper than Opus and plenty capable for this task.
@@ -127,6 +134,11 @@ JUDGE_BACKEND = "anthropic"
 # "claude-haiku-4-5" for cheapest (may miss subtle cues).
 MODEL = "claude-sonnet-4-6"
 EFFORT = "medium"  # low | medium | high
+
+# ---------- Gemini settings (when JUDGE_BACKEND == "gemini") ----------
+# Reads GEMINI_API_KEY from your .env. "gemini-2.5-flash" is the cheap/fast
+# default (free tier available); "gemini-2.5-pro" for top quality.
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ---------- Ollama settings (when JUDGE_BACKEND == "ollama") ----------
 # Vision-capable models that handle multiple images per turn:
