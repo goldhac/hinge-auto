@@ -266,6 +266,16 @@ def judge_one(idx: int, total: int, fresh_only: bool = True) -> str:
 
 # --------------------------------------------------------------- loops ----
 
+def _premade_lines() -> list[str]:
+    """Premade opener messages for the fast slots, each repeated by its
+    optional 'weight' (default 1) so better-performing lines come up more
+    often in the rotation."""
+    out = []
+    for p in config.PREMADES:
+        out.extend([p["message"]] * max(1, int(p.get("weight", 1))))
+    return out or [""]
+
+
 def _semi_schedule(total: int, gemini: int) -> list[str]:
     """Interleave `gemini` Gemini-judged slots evenly across `total` profiles;
     the rest are fast. For 30/10 this yields a clean 1-in-3 spacing."""
@@ -283,7 +293,7 @@ def _semi_schedule(total: int, gemini: int) -> list[str]:
 
 def run_fast(n: int) -> None:
     adb.check_device()
-    lines = [p["message"] for p in config.PREMADES]
+    lines = _premade_lines()
     print(f"FAST mode: {n} profiles, lines={len(lines)}, NO Gemini.\n")
     ensure_hinge()
     sent = others = 0
@@ -333,7 +343,7 @@ def run_semi(total: int, gemini: int) -> None:
     print(f"SEMI mode: {total} profiles -> {nfast} FAST (your lines) + "
           f"{ngem} GEMINI-judged, interleaved.\n")
     ensure_hinge()
-    lines = [p["message"] for p in config.PREMADES]
+    lines = _premade_lines()
     sent = skipped = fails = 0
     fast_i = 0
     t_start = time.monotonic()

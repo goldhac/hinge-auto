@@ -98,7 +98,15 @@ def do_like(message: str = "") -> None:
     # a heart that's already low on screen (which it is after capture),
     # Send Like ends up off-screen and undetectable. Worth the ~14s.
     scroll_back_to_top()
-    heart_xy = vision.find_first_heart(adb.screenshot())
+    # Retry the heart lookup -- after scroll-back the top photo can still be
+    # rendering (or be a tricky/overexposed frame), and a single screenshot
+    # misses it. Mirrors the Send-Like retry below.
+    heart_xy = None
+    for _ in range(4):
+        heart_xy = vision.find_first_heart(adb.screenshot())
+        if heart_xy is not None:
+            break
+        time.sleep(1.0)
     if heart_xy is None:
         # Static fallback used to fire here, but it silently misses on
         # profiles where the heart's real position differs from the
