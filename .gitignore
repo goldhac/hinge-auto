@@ -25,6 +25,9 @@ screenshots/
 modes/_akp_local.py
 *.local.py
 
+# UI hierarchy dumps — contain real profile text
+_ui*.xml
+
 # Captured screenshots and ad-hoc state files
 _state.png
 _*.png

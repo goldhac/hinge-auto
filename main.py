@@ -110,7 +110,16 @@ def do_like(message: str = "") -> None:
     adb.tap(*heart_xy)
     adb.jitter_sleep("after_tap")
 
-    send_xy = vision.find_send_like(adb.screenshot())
+    # The compose box renders a beat after the heart tap; a single screenshot
+    # often misses the Send Like button on a slow frame. Retry before giving
+    # up so a slow box isn't misread as a failure (which traps the loop /
+    # leaves the compose open for the next profile).
+    send_xy = None
+    for _ in range(4):
+        send_xy = vision.find_send_like(adb.screenshot())
+        if send_xy is not None:
+            break
+        time.sleep(1.0)
     if send_xy is None:
         # Same reasoning as the heart fallback above — silent fallback
         # masks a real failure and traps the loop. Skip instead.
