@@ -53,19 +53,31 @@ def handle_anr() -> bool:
     space rather than hitting 'Close app' just above it."""
     out = (adb._run(["shell", "dumpsys", "window", "windows"],
                     capture=True) or b"").decode("utf-8", "ignore")
-    if "not responding" in out.lower():
-        print("  ! ANR dialog -> tapping Wait, pausing for app to recover")
+    if "not responding" not in out.lower():
+        return False
+    print("  ! ANR dialog -> dismissing (Wait), pausing for recovery")
+    # The ANR dialog is a SYSTEM dialog, so uiautomator can read it (unlike
+    # Hinge's custom views). Tap the actual 'Wait' node wherever it rendered;
+    # fall back to a fixed lower-button coordinate if the dump came up empty.
+    xml = _ui_dump()
+    if not _tap_node_text(xml, "Wait"):
         adb._run(["shell", "input", "tap", "320", "1380"])
-        time.sleep(6)
-        return True
-    return False
+    time.sleep(6)
+    return True
 
 
 def _ui_dump() -> str:
-    """Dump the current UI hierarchy as XML (text + bounds per node)."""
-    adb._run(["shell", "uiautomator", "dump", "/sdcard/_ui.xml"], capture=True)
-    return (adb._run(["shell", "cat", "/sdcard/_ui.xml"],
-                     capture=True) or b"").decode("utf-8", "ignore")
+    """Dump the current UI hierarchy as XML (text + bounds per node).
+
+    Resilient: returns '' if the dump or read fails -- e.g. uiautomator isn't
+    ready yet right after a reboot, or the file wasn't written. A failed dump
+    must not crash the caller; check_overlay just treats it as 'no overlay'."""
+    try:
+        adb._run(["shell", "uiautomator", "dump", "/sdcard/_ui.xml"], capture=True)
+        return (adb._run(["shell", "cat", "/sdcard/_ui.xml"],
+                         capture=True) or b"").decode("utf-8", "ignore")
+    except Exception:
+        return ""
 
 
 def _tap_node_text(xml: str, want: str) -> bool:
