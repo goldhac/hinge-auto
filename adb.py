@@ -40,13 +40,21 @@ def tap(x: int, y: int) -> None:
 def input_text(text: str) -> None:
     """Type `text` into the currently focused field via `adb shell input text`.
 
-    Single-quotes the payload with shlex so $, `, ", and spaces survive the
+    Types in small chunks with brief pauses. A single `input text` of a long
+    string silently drops characters when the device is under load (the host
+    emulator stalls and its input buffer overflows), which sent truncated
+    openers. Chunking keeps each command small so the buffer keeps up.
+
+    Single-quotes each chunk with shlex so $, `, ", and spaces survive the
     device shell. Caller should keep text plain ASCII — emoji and the chars
     \\ " $ ` should be filtered upstream (the model is instructed to avoid
     them) since `input text` itself only sends keyevents.
     """
-    quoted = shlex.quote(text)
-    _run(["shell", f"input text {quoted}"])
+    CHUNK = 10
+    for i in range(0, len(text), CHUNK):
+        piece = text[i:i + CHUNK]
+        _run(["shell", f"input text {shlex.quote(piece)}"])
+        time.sleep(0.25)
 
 
 def swipe(x1: int, y1: int, x2: int, y2: int, duration_ms: int = 300) -> None:
