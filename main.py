@@ -147,7 +147,7 @@ def do_like(message: str = "") -> None:
         # Expected pixel count grows with message length; require we see
         # well above the empty baseline before sending.
         deadline = time.monotonic() + 30
-        target_pixels = empty_pixels + max(150, 20 * len(message))
+        target_pixels = empty_pixels + max(150, 15 * len(message))
         while time.monotonic() < deadline:
             time.sleep(1.0)
             current = vision.comment_field_text_pixels(adb.screenshot(), send_xy)
@@ -157,13 +157,43 @@ def do_like(message: str = "") -> None:
             print(f"WARN: typed text didn't reach expected pixel density "
                   f"(have {current}, want {target_pixels}) — sending anyway.")
         # Typed text can wrap to multiple lines, expanding the comment
-        # field and pushing Send Like down. Re-find against the post-type
-        # screen so the tap lands on the actual button position.
+        # field and pushing Send Like down -- behind the keyboard, where
+        # vision can't see it. Drop the keyboard, then re-find against the
+        # post-type screen so the tap lands on the actual button position.
+        adb.hide_keyboard()
         post_type_xy = vision.find_send_like(adb.screenshot())
-        if post_type_xy is not None:
-            send_xy = post_type_xy
+        if post_type_xy is None:
+            # The pre-type position is now the comment box -- tapping it
+            # silently drops the like. Bail so the caller skips cleanly.
+            raise RuntimeError("vision: Send Like not visible after typing")
+        send_xy = post_type_xy
     adb.tap(*send_xy)
     adb.jitter_sleep("after_like_sent")
+    shot = adb.screenshot()
+    if vision.like_blocked(shot):
+        raise LikesBlocked(
+            "Hinge: 'Too many people are waiting for your reply' -- reply to or "
+            "unmatch some matches, then re-run.")
+    # Verify the like actually went: a sent like closes the compose card.
+    # If Send Like is still on screen the tap missed (seen on profiles with a
+    # 'Most Compatible' banner, where the card sits at the very bottom) --
+    # re-find and retry once, then give up loudly instead of counting it.
+    retry_xy = vision.find_send_like(shot)
+    if retry_xy is not None:
+        adb.hide_keyboard()
+        retry_xy = vision.find_send_like(adb.screenshot()) or retry_xy
+        adb.tap(*retry_xy)
+        adb.jitter_sleep("after_like_sent")
+        shot = adb.screenshot()
+        if vision.find_send_like(shot) is not None:
+            config.DEBUG_DIR.mkdir(exist_ok=True)
+            (config.DEBUG_DIR / f"send_failed_{int(time.time())}.png").write_bytes(shot)
+            raise RuntimeError("Send Like tapped twice but compose card is still open")
+        print(f"  (Send Like needed a retry: {send_xy} -> {retry_xy})")
+
+
+class LikesBlocked(RuntimeError):
+    """Hinge refuses all likes until pending matches are answered."""
 
 
 def save_debug(frames: list[bytes], decision, profile_idx: int) -> None:
@@ -281,6 +311,8 @@ def main() -> int:
     all_premades = list(config.PREMADES)
     premade_uses: dict[str, int] = {}
     premade_cap = getattr(config, "PREMADE_MAX_USES", 3)
+    # A premade may set its own "max_uses" to override the global cap.
+    cap_of = {p["id"]: p.get("max_uses", premade_cap) for p in all_premades}
 
     likes_sent = 0
     skips = 0
@@ -336,6 +368,17 @@ def main() -> int:
             duplicate_streak += 1
             print(f"DUPLICATE: frame 0 matches previous profile "
                   f"(streak {duplicate_streak}). Force-skipping without judge.")
+            if duplicate_streak >= 8:
+                print("STOPPING: stuck on the same screen after Discover recovery.")
+                break
+            if duplicate_streak >= 3:
+                # Usually a match notification dragged us off Discover
+                # (e.g. onto the Matches tab) -- tapping X there does
+                # nothing. Jump back via the bottom-nav Discover tab.
+                print("  (recovering: tapping the Discover tab)")
+                adb.tap(116, 2280)
+                time.sleep(3)
+                continue
             try:
                 do_skip()
             except Exception as e:
@@ -349,7 +392,7 @@ def main() -> int:
         # writes a fresh opener for this profile instead of repeating it.
         config.PREMADES = [
             p for p in all_premades
-            if premade_uses.get(p["id"], 0) < premade_cap
+            if premade_uses.get(p["id"], 0) < cap_of[p["id"]]
         ]
 
         t1 = time.monotonic()
@@ -408,9 +451,13 @@ def main() -> int:
                     premade_uses[decision.premade_id] = (
                         premade_uses.get(decision.premade_id, 0) + 1
                     )
-                    if premade_uses[decision.premade_id] >= premade_cap:
+                    cap = cap_of.get(decision.premade_id, premade_cap)
+                    if premade_uses[decision.premade_id] >= cap:
                         print(f"  (premade '{decision.premade_id}' hit cap "
-                              f"{premade_cap}; hiding it for the rest of the run)")
+                              f"{cap}; hiding it for the rest of the run)")
+            except LikesBlocked as e:
+                print(f"STOPPING: {e}")
+                break
             except Exception as e:
                 print(f"do_like failed: {e!r} — recovering by skipping this profile.")
                 try:

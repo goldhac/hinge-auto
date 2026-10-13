@@ -20,6 +20,10 @@
 >   on a phone UI is an interesting AI engineering exercise, not because
 >   anyone thinks bot-swiping is good dating advice.
 
+## New here? Start with [ONBOARDING.md](./ONBOARDING.md)
+
+It's a short Windows quick start that goes from a clean PC to your first run in about 45 minutes.
+
 ## Tip: open this repo in Claude Code or Codex
 
 This repo ships with [`AGENTS.md`](./AGENTS.md) (and [`CLAUDE.md`](./CLAUDE.md)).
@@ -88,7 +92,7 @@ on your PATH, find it under your Android SDK directory (on Windows:
 ### 2. Install repo dependencies
 
 ```
-git clone https://github.com/TerraByte-Dev/hinge-auto.git
+git clone https://github.com/goldhac/hinge-auto.git
 cd hinge-auto
 pip install -r requirements.txt
 ```

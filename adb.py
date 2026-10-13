@@ -10,11 +10,27 @@ import config
 
 def _run(args: list[str], capture: bool = False) -> bytes | None:
     cmd = ["adb"] + args
-    if capture:
-        result = subprocess.run(cmd, capture_output=True, check=True)
-        return result.stdout
-    subprocess.run(cmd, check=True)
-    return None
+    # adb occasionally fails a single call transiently (exit 1 on a swipe)
+    # and one hiccup shouldn't kill a whole session -- retry a few times.
+    # Never retry `input text`: a partial first attempt would double-type.
+    attempts = 1 if "text" in args else 3
+    for i in range(attempts):
+        try:
+            result = subprocess.run(cmd, capture_output=capture, check=True)
+            return result.stdout if capture else None
+        except subprocess.CalledProcessError:
+            if i == attempts - 1:
+                raise
+            time.sleep(1.0)
+
+
+def hide_keyboard() -> None:
+    """Dismiss the soft keyboard if it's up. Only sends BACK when the IME
+    reports shown -- a BACK with no keyboard would close the compose card."""
+    out = _run(["shell", "dumpsys", "input_method"], capture=True).decode()
+    if "mInputShown=true" in out:
+        _run(["shell", "input", "keyevent", "KEYCODE_BACK"])
+        time.sleep(0.8)
 
 
 def check_device() -> str:
