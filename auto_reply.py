@@ -105,7 +105,12 @@ def _chat_field():
 def _reply_open_chat(row_name: str) -> str:
     """Reply in the chat that's open. Returns 'sent', 'needs_you' or 'fail'."""
     if not _chat_field():
-        adb.tap(540, 1610)   # 'You matched / View note' card sits over new chats
+        nodes = _nodes()
+        start = next((((a + c) // 2, (b + d) // 2) for t, a, b, c, d in nodes if t == "Start the chat"), None)
+        if start:   # 'You either want me or you don't' card: Start the chat / Unmatch
+            adb.tap(*start)
+        elif not any("Unmatch" in t for t, *_ in nodes):   # never blind-tap near Unmatch
+            adb.tap(540, 1610)   # 'You matched / View note' card sits over new chats
         time.sleep(2)
         if not _chat_field():
             _log(to=row_name, status="fail", why="no message field")
@@ -137,6 +142,12 @@ def reply_all(max_chats: int = 15) -> int:
     """Reply to every 'Your turn' chat. Returns how many replies were sent.
     Ends back on the Discover tab."""
     adb.hide_keyboard()
+    sent = 0
+    # A new-match card ('Start the chat / Unmatch') can sit over every tab.
+    if any(t == "Start the chat" for t, *_ in _nodes()):
+        print("[auto-reply] new-match card on screen, starting that chat")
+        sent += _reply_open_chat("new match") == "sent"
+        adb.hide_keyboard(); _back()
     adb.tap(*MATCHES_TAB); time.sleep(3)
     if hm.your_turn_count() is None:   # off Hinge (a stray BACK can exit it): relaunch
         adb._run(["shell", "monkey", "-p", "co.hinge.app", "-c", "android.intent.category.LAUNCHER", "1"], capture=True)
@@ -144,7 +155,7 @@ def reply_all(max_chats: int = 15) -> int:
         adb.tap(*MATCHES_TAB); time.sleep(3)
     print(f"[auto-reply] your turn: {hm.your_turn_count()}")
     done = set()              # one reply per chat per pass
-    sent, passed = 0, set()   # passed = chats left for the user or that failed
+    passed = set()            # passed = chats left for the user or that failed
     for _ in range(max_chats):
         rows = [r for r in hm._your_turn_rows() if r[0] not in passed and r[0] not in done]
         if not rows:
