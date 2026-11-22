@@ -252,12 +252,23 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "advance to the next city in the rotation. Loops back to "
              "start when exhausted.",
     )
+    p.add_argument(
+        "--likes",
+        type=int,
+        default=None,
+        help="Override MAX_LIKES_PER_SESSION for this run. Profiles cap "
+             "is set 20%% higher, since skips count against it.",
+    )
     return p.parse_args(argv)
 
 
 def main() -> int:
     args = _parse_args()
-    load_dotenv()
+    load_dotenv(override=True)  # .env beats a stale key in the Windows environment
+
+    if args.likes:
+        config.MAX_LIKES_PER_SESSION = args.likes
+        config.MAX_PROFILES_PER_SESSION = int(args.likes * 1.2) + 1
 
     if args.mode:
         config.ACTIVE_MODE = args.mode

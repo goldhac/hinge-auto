@@ -1,5 +1,6 @@
 # Secrets
 .env
+.env.bak
 
 # Calibrated coordinate files (per-device, never commit real values)
 filter_coords.json

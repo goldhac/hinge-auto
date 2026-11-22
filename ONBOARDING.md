@@ -7,6 +7,24 @@ explanation of modes, backends and calibration, see [README.md](./README.md).
 > the account banned with no appeal. Use a throwaway account. The bot
 > sends real likes and messages to real people — start with a dry run.
 
+## Easy way: one command
+
+Open PowerShell (Start menu, type "PowerShell") and paste:
+
+```
+irm https://raw.githubusercontent.com/goldhac/hinge-auto/main/install.ps1 | iex
+```
+
+It installs everything (about 3 GB, 20–30 min), asks for a free Gemini
+key, and boots the emulator. Then, one time only, in the emulator: sign into
+the Play Store, install Hinge, log in, and open Discover. After that,
+double-click **Hinge Bot** on the desktop. It asks how many likes and runs.
+
+If it says to restart for virtualization, restart and paste the same command
+again. It picks up where it left off.
+
+The steps below are the manual route, if you'd rather do it by hand.
+
 ## 1. Install the tools
 
 Open PowerShell (a normal one, not as Administrator) and run:
