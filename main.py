@@ -18,6 +18,7 @@ import io
 from PIL import Image
 
 import adb
+import auto_reply
 import config
 import metrics
 import vision
@@ -192,6 +193,16 @@ def do_like(message: str = "") -> None:
         print(f"  (Send Like needed a retry: {send_xy} -> {retry_xy})")
 
 
+def _close_compose_card() -> None:
+    """A failed like can leave the compose card + keyboard open over the skip
+    button, so every later skip misses and the bot re-judges one profile
+    forever. Close both."""
+    adb.hide_keyboard()
+    if "Edit comment" in adb._run(["shell", "uiautomator", "dump", "/dev/tty"], capture=True).decode("utf-8", "ignore"):
+        adb._run(["shell", "input", "keyevent", "KEYCODE_BACK"])
+        time.sleep(1.5)
+
+
 class LikesBlocked(RuntimeError):
     """Hinge refuses all likes until pending matches are answered."""
 
@@ -326,6 +337,8 @@ def main() -> int:
     cap_of = {p["id"]: p.get("max_uses", premade_cap) for p in all_premades}
 
     likes_sent = 0
+    like_fails = 0
+    replies_left = 10   # cap auto-reply passes triggered by blocks
     skips = 0
     profiles_seen = 0
     total_cost = 0.0
@@ -427,6 +440,8 @@ def main() -> int:
                     "authentication_error",
                     "invalid_api_key",
                     "permission_error",
+                    "credits are depleted",   # Gemini prepaid project out of credits (402)
+                    "API_KEY_INVALID",
                 )):
                     fatal_error = err
                     break
@@ -458,6 +473,9 @@ def main() -> int:
             try:
                 do_like(decision.message)
                 likes_sent += 1
+                like_fails = 0
+                if config.AUTO_REPLY_EVERY and likes_sent % config.AUTO_REPLY_EVERY == 0:
+                    auto_reply.reply_all()
                 if decision.premade_id:
                     premade_uses[decision.premade_id] = (
                         premade_uses.get(decision.premade_id, 0) + 1
@@ -467,10 +485,23 @@ def main() -> int:
                         print(f"  (premade '{decision.premade_id}' hit cap "
                               f"{cap}; hiding it for the rest of the run)")
             except LikesBlocked as e:
+                if config.AUTO_REPLY_EVERY and replies_left > 0 and auto_reply.reply_all() > 0:
+                    replies_left -= 1
+                    print("Replied to waiting matches -- continuing.")
+                    continue
                 print(f"STOPPING: {e}")
                 break
             except Exception as e:
                 print(f"do_like failed: {e!r} — recovering by skipping this profile.")
+                _close_compose_card()
+                like_fails += 1
+                # Hinge sometimes shows the reply gate as a compose card with
+                # only Rose / priority like and no Send Like: replying clears it.
+                if like_fails >= 2 and config.AUTO_REPLY_EVERY and replies_left > 0:
+                    like_fails = 0
+                    if auto_reply.reply_all() > 0:
+                        replies_left -= 1
+                        continue
                 try:
                     do_skip()
                 except Exception as e2:

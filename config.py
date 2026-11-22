@@ -51,6 +51,10 @@ DRY_RUN = False
 MAX_LIKES_PER_SESSION = 20
 MAX_PROFILES_PER_SESSION = 20
 
+# Auto-reply (auto_reply.py): answer 'Your turn' chats every N likes and
+# whenever Hinge blocks likes for unanswered chats. 0 turns it off.
+AUTO_REPLY_EVERY = 15
+
 # Max times any single premade opener may be sent per session. Once a
 # premade hits this cap it's hidden from the judge so it writes a fresh
 # opener instead -- stops the same canned line going to many people.
