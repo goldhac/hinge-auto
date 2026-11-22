@@ -116,6 +116,11 @@ def _reply_open_chat(row_name: str) -> str:
             _log(to=row_name, status="fail", why="no message field")
             return "fail"
     adb.hide_keyboard()
+    if any(t.startswith("Not delivered") for t, *_ in _nodes()):
+        # Hinge is refusing this chat (she may have unmatched); more sends just pile up.
+        _log(to=row_name, status="needs_you", why="earlier messages not delivered")
+        print(f"  {row_name}: left for you (messages not delivering)")
+        return "needs_you"
     out = _write_reply(adb.screenshot())
     text = _clean(out.get("reply", ""))
     name = out.get("name") or row_name
